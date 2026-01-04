@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VcalL - Simple Video Call</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        :root { --bg: #f4f7f6; --text: #333; --card: #ffffff; --primary: #2563eb; }
+        .dark-mode { --bg: #121212; --text: #e0e0e0; --card: #1e1e1e; --primary: #3b82f6; }
+
+        body { 
+            background: var(--bg); color: var(--text); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; transition: 0.3s;
+        }
+
+        /* UI Layout */
+        .container { width: 90%; max-width: 900px; text-align: center; padding: 20px; }
+        .video-wrapper { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; 
+            margin-top: 20px; background: var(--card); padding: 15px; border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        video { width: 100%; border-radius: 10px; background: #000; object-fit: cover; }
+        
+        /* Controls */
+        .controls { margin: 20px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 200px; }
+        button { 
+            padding: 10px 20px; border: none; border-radius: 5px; 
+            cursor: pointer; background: var(--primary); color: white; font-weight: bold; 
+        }
+        #end-btn { background: #ef4444; }
+        #theme-toggle { position: absolute; top: 20px; right: 20px; }
+
+        .id-display { font-size: 0.9em; margin-bottom: 10px; opacity: 0.8; }
+        b { color: var(--primary); }
+
+        @media (max-width: 600px) { .video-wrapper { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <button id="theme-toggle">🌓 Mode</button>
+
+    <div class="container">
+        <h1>VcalL</h1>
+        
+        <div class="id-display">Your ID: <b id="my-id">Connecting...</b></div>
+        
+        <div class="controls">
+            <input type="text" id="remote-id" placeholder="Enter Friend's ID">
+            <button id="call-btn">Start Call</button>
+            <button id="end-btn" onclick="location.reload()">End Call</button>
+        </div>
+
+        <div class="video-wrapper">
+            <div>
+                <p>You</p>
+                <video id="local-video" autoplay muted playsinline></video>
+            </div>
+            <div>
+                <p>Remote</p>
+                <video id="remote-video" autoplay playsinline></video>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Initialize PeerJS (Connects to PeerJS public cloud server)
+        const peer = new Peer(); 
+        let localStream;
+
+        const myIdDisplay = document.getElementById('my-id');
+        const remoteIdInput = document.getElementById('remote-id');
+        const callBtn = document.getElementById('call-btn');
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+
+        // 2. Get Camera and Mic
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localStream = stream;
+                localVideo.srcObject = stream;
+            }).catch(err => alert("Please allow camera access"));
+
+        // 3. Show your ID once connected
+        peer.on('open', id => {
+            myIdDisplay.innerText = id;
+        });
+
+        // 4. Handle Incoming Calls
+        peer.on('call', call => {
+            call.answer(localStream); // Answer with your stream
+            call.on('stream', userRemoteStream => {
+                remoteVideo.srcObject = userRemoteStream;
+            });
+        });
+
+        // 5. Start a Call to someone else
+        callBtn.onclick = () => {
+            const remoteId = remoteIdInput.value;
+            if (!remoteId) return alert("Enter an ID first!");
+            
+            const call = peer.call(remoteId, localStream);
+            call.on('stream', userRemoteStream => {
+                remoteVideo.srcObject = userRemoteStream;
+            });
+        };
+
+        // Day and Night Mode
+        document.getElementById('theme-toggle').onclick = () => {
+            document.body.classList.toggle('dark-mode');
+        };
+    </script>
+</body>
+</html>
