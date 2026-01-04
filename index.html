@@ -9,60 +9,20 @@
         :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --primary: #3b82f6; --danger: #ef4444; }
         .light-mode { --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --primary: #2563eb; }
 
-        body { 
-            background: var(--bg); color: var(--text); 
-            font-family: 'Inter', system-ui, sans-serif;
-            margin: 0; transition: 0.3s; overflow-x: hidden;
-        }
-
-        /* Modern Glassmorphism Setup */
-        .setup-screen {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; gap: 20px;
-        }
-        .setup-box {
-            background: var(--card); padding: 40px; border-radius: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 320px; text-align: center;
-        }
-        h1 { font-size: 2rem; margin-bottom: 20px; letter-spacing: -1px; }
-
-        input { 
-            width: 100%; padding: 12px; margin: 10px 0; border-radius: 12px; 
-            border: 1px solid #334155; background: rgba(0,0,0,0.2); color: inherit;
-            box-sizing: border-box; font-size: 1rem;
-        }
-
-        button { 
-            width: 100%; padding: 14px; border: none; border-radius: 12px; 
-            cursor: pointer; background: var(--primary); color: white; 
-            font-weight: 600; margin-top: 10px; transition: 0.2s;
-        }
-        button:hover { opacity: 0.9; transform: translateY(-1px); }
-
-        /* Modern Responsive Video Grid */
-        #meeting-screen { display: none; padding: 20px; height: 100vh; flex-direction: column; }
-        #video-grid { 
-            display: grid; gap: 15px; width: 100%; max-width: 1200px; 
-            margin: 0 auto; flex-grow: 1;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            align-content: center;
-        }
-
-        .video-container { 
-            position: relative; background: #000; border-radius: 16px; 
-            overflow: hidden; aspect-ratio: 16/9; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .local-video { transform: scaleX(-1); }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; transition: 0.3s; overflow: hidden; }
+        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
+        .setup-box { background: var(--card); padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 320px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: rgba(0,0,0,0.2); color: inherit; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; border: none; border-radius: 12px; cursor: pointer; background: var(--primary); color: white; font-weight: 600; margin-top: 10px; }
         
-        .name-badge { 
-            position: absolute; bottom: 12px; left: 12px; 
-            background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);
-            color: white; padding: 4px 12px; border-radius: 8px; font-size: 0.85rem; 
-        }
-
-        #theme-toggle { position: absolute; top: 20px; right: 20px; width: auto; padding: 8px 15px; }
-        .leave-btn { background: var(--danger); width: auto; padding: 12px 30px; margin: 20px auto; }
+        #meeting-screen { display: none; padding: 20px; height: 100vh; flex-direction: column; }
+        #video-grid { display: grid; gap: 15px; width: 100%; max-width: 1200px; margin: 0 auto; flex-grow: 1; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); align-content: center; }
+        .video-container { position: relative; background: #000; border-radius: 16px; overflow: hidden; aspect-ratio: 16/9; }
+        video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        .local-video { transform: scaleX(-1); }
+        .name-badge { position: absolute; bottom: 12px; left: 12px; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); color: white; padding: 4px 12px; border-radius: 8px; font-size: 0.85rem; }
+        #theme-toggle { position: absolute; top: 20px; right: 20px; width: auto; }
+        .leave-btn { background: var(--danger); width: auto; padding: 12px 30px; margin: 20px auto; align-self: center; }
     </style>
 </head>
 <body>
@@ -79,84 +39,85 @@
     </div>
 
     <div id="meeting-screen">
-        <div id="video-grid">
-            </div>
+        <div id="video-grid"></div>
         <button class="leave-btn" onclick="location.reload()">Leave Room</button>
     </div>
 
     <script>
         let localStream;
         let myPeer;
-        const peers = {}; // Keep track of connected users
         const videoGrid = document.getElementById('video-grid');
+        const connectedPeers = {};
 
-        // Toggle Theme
         document.getElementById('theme-toggle').onclick = () => document.body.classList.toggle('light-mode');
 
-        // Handle Join
         document.getElementById('join-btn').onclick = async () => {
             const name = document.getElementById('username').value;
             const roomCode = document.getElementById('room-code').value;
 
-            if (!name || !roomCode) return alert("Please enter Name and Room Code");
+            if (!name || !roomCode) return alert("Enter Name and Code");
 
-            // Get Camera Access
             try {
+                // FIXED: Request permissions specifically for desktop/mobile compatibility
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('setup-screen').style.display = 'none';
                 document.getElementById('meeting-screen').style.display = 'flex';
                 
-                addVideo(localStream, name, true);
+                addVideo(localStream, name + " (You)", true, 'local');
 
-                // Initialize Peer with a combined ID: roomCode_userName
-                // We use a random suffix to avoid ID collisions if two people have the same name
-                const myID = roomCode + "_" + name + "_" + Math.floor(Math.random() * 1000);
-                myPeer = new Peer(myID);
-
-                myPeer.on('open', id => {
-                    console.log('Joined room with ID:', id);
-                    // To join a room, we need to find others. 
-                    // Note: PeerJS doesn't have a native "list peers" for privacy.
-                    // In this simple version, users must manually call or use a logic to connect.
-                    // For a true "Room" experience without a backend, we listen for incoming calls.
-                });
-
-                // Listen for incoming calls
-                myPeer.on('call', call => {
-                    call.answer(localStream);
-                    call.on('stream', userStream => {
-                        const peerName = call.peer.split("_")[1]; // Extract name from ID
-                        addVideo(userStream, peerName);
+                // To make a room work without a server, we use roomCode + index (1 to 10)
+                // We try to find a free "slot" in the room
+                let foundSlot = false;
+                for(let i=1; i<=10; i++) {
+                    const tryID = `${roomCode}-slot-${i}`;
+                    myPeer = new Peer(tryID);
+                    
+                    myPeer.on('open', id => {
+                        foundSlot = true;
+                        // Once we are in a slot, we call all other 9 possible slots to see who is there
+                        for(let j=1; j<=10; j++) {
+                            if(i === j) continue;
+                            const targetID = `${roomCode}-slot-${j}`;
+                            callUser(targetID);
+                        }
                     });
-                });
 
-                // Logic to connect to others (Normally requires a backend signaling)
-                // Since we are "Serverless", you can tell your friend to "Call" your specific ID
-                // or use a discovery service.
-                alert("Room Active: Share the code with friends. They will appear here when they call you.");
+                    myPeer.on('call', call => {
+                        call.answer(localStream);
+                        call.on('stream', stream => addVideo(stream, "Guest", false, call.peer));
+                    });
+
+                    myPeer.on('error', err => {
+                        if(err.type === 'unavailable-id') return; // Slot taken, try next
+                    });
+                    
+                    if(foundSlot) break;
+                    await new Promise(r => setTimeout(r, 500)); // Short delay to check next slot
+                }
 
             } catch (e) {
-                alert("Camera Access Denied");
+                alert("Camera Access Denied. Please ensure you are using HTTPS and have allowed permissions.");
             }
         };
 
-        function addVideo(stream, name, isLocal = false) {
-            // Max 10 Check
-            if (document.querySelectorAll('.video-container').length >= 10) return;
+        function callUser(targetID) {
+            const call = myPeer.call(targetID, localStream);
+            call.on('stream', stream => addVideo(stream, "Guest", false, targetID));
+        }
 
+        function addVideo(stream, name, isLocal, peerId) {
+            if (document.getElementById(peerId)) return;
             const container = document.createElement('div');
+            container.id = peerId;
             container.className = 'video-container';
-            
             const video = document.createElement('video');
             video.srcObject = stream;
             video.autoplay = true;
             video.playsInline = true;
             if (isLocal) video.classList.add('local-video');
-            
             const badge = document.createElement('div');
             badge.className = 'name-badge';
             badge.innerText = name;
-
             container.append(video, badge);
             videoGrid.append(container);
         }
