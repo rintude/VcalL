@@ -3,122 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VcalL - Group Video</title>
+    <title>VcalL - WhatsApp Style</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --primary: #3b82f6; --danger: #ef4444; }
-        .light-mode { --bg: #f1f5f9; --card: #ffffff; --text: #1e293b; --primary: #2563eb; }
+        :root { --wa-bg: #0b141a; --wa-card: #202c33; --wa-primary: #00a884; --wa-danger: #f15c6d; --wa-text: #e9edef; }
+        .light-mode { --wa-bg: #f0f2f5; --wa-card: #ffffff; --wa-primary: #008069; --wa-danger: #ea0038; --wa-text: #111b21; }
 
-        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; transition: 0.3s; overflow: hidden; }
-        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 20px; }
-        .setup-box { background: var(--card); padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 320px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 12px; border: 1px solid #334155; background: rgba(0,0,0,0.2); color: inherit; box-sizing: border-box; }
-        button { width: 100%; padding: 14px; border: none; border-radius: 12px; cursor: pointer; background: var(--primary); color: white; font-weight: 600; margin-top: 10px; }
+        body { background: var(--wa-bg); color: var(--wa-text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; transition: 0.3s; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Setup Screen */
+        .setup-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 20px; box-sizing: border-box; }
+        .setup-box { background: var(--wa-card); padding: 30px; border-radius: 20px; width: 100%; max-width: 360px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        h1 { color: var(--wa-primary); margin-top: 0; font-size: 28px; }
+        input { width: 100%; padding: 14px; margin: 10px 0; border-radius: 10px; border: none; background: #2a3942; color: white; box-sizing: border-box; font-size: 16px; }
+        .light-mode input { background: #fff; border: 1px solid #ddd; color: #000; }
+        .join-btn { width: 100%; padding: 14px; border: none; border-radius: 10px; cursor: pointer; background: var(--wa-primary); color: white; font-weight: bold; font-size: 16px; margin-top: 10px; }
+
+        /* Meeting Header */
+        header { display: none; background: var(--wa-card); padding: 15px 20px; justify-content: space-between; align-items: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .room-info { font-weight: 500; }
+
+        /* Video Grid */
+        #meeting-screen { display: none; flex-direction: column; height: 100vh; }
+        #video-grid { display: grid; gap: 10px; padding: 10px; flex-grow: 1; align-content: center; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); overflow-y: auto; }
         
-        #meeting-screen { display: none; padding: 20px; height: 100vh; flex-direction: column; }
-        #video-grid { display: grid; gap: 15px; width: 100%; max-width: 1200px; margin: 0 auto; flex-grow: 1; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); align-content: center; }
-        .video-container { position: relative; background: #000; border-radius: 16px; overflow: hidden; aspect-ratio: 16/9; }
-        video { width: 100%; height: 100%; object-fit: cover; background: #000; }
-        .local-video { transform: scaleX(-1); }
-        .name-badge { position: absolute; bottom: 12px; left: 12px; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); color: white; padding: 4px 12px; border-radius: 8px; font-size: 0.85rem; }
-        #theme-toggle { position: absolute; top: 20px; right: 20px; width: auto; }
-        .leave-btn { background: var(--danger); width: auto; padding: 12px 30px; margin: 20px auto; align-self: center; }
+        .video-container { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 3/4; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .local-v { transform: scaleX(-1); border: 2px solid var(--wa-primary); }
+        .name-tag { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 5px; font-size: 12px; color: white; }
+
+        /* Fixed Controls */
+        .bottom-bar { display: none; background: var(--wa-card); padding: 20px; justify-content: center; gap: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .circle-btn { width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; }
+        .leave-btn { background: var(--wa-danger); }
+        #theme-toggle { background: transparent; color: var(--wa-primary); border: 1px solid var(--wa-primary); cursor: pointer; padding: 5px 10px; border-radius: 5px; }
+
+        @media (min-width: 768px) { .video-container { aspect-ratio: 16/9; } }
     </style>
 </head>
 <body>
-
-    <button id="theme-toggle">🌓 Mode</button>
 
     <div id="setup-screen" class="setup-screen">
         <div class="setup-box">
             <h1>VcalL</h1>
             <input type="text" id="username" placeholder="Your Name">
-            <input type="text" id="room-code" placeholder="Secret Room Code">
-            <button id="join-btn">Join / Create Room</button>
+            <input type="text" id="room-code" placeholder="Room Secret Code">
+            <button class="join-btn" id="join-btn">Join Room</button>
+            <br><br>
+            <button id="theme-toggle">Toggle Day/Night</button>
         </div>
     </div>
 
+    <header id="app-header">
+        <div class="room-info" id="room-display">VcalL Room</div>
+        <div style="font-size: 12px; opacity: 0.8;">Active Call</div>
+    </header>
+
     <div id="meeting-screen">
         <div id="video-grid"></div>
-        <button class="leave-btn" onclick="location.reload()">Leave Room</button>
+        <div class="bottom-bar" id="bottom-bar">
+            <button class="circle-btn leave-btn" onclick="location.reload()">📞</button>
+        </div>
     </div>
 
     <script>
         let localStream;
         let myPeer;
         const videoGrid = document.getElementById('video-grid');
-        const connectedPeers = {};
 
         document.getElementById('theme-toggle').onclick = () => document.body.classList.toggle('light-mode');
 
         document.getElementById('join-btn').onclick = async () => {
             const name = document.getElementById('username').value;
-            const roomCode = document.getElementById('room-code').value;
+            const code = document.getElementById('room-code').value;
 
-            if (!name || !roomCode) return alert("Enter Name and Code");
+            if (!name || !code) return alert("Fill all fields");
 
             try {
-                // FIXED: Request permissions specifically for desktop/mobile compatibility
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                
                 document.getElementById('setup-screen').style.display = 'none';
                 document.getElementById('meeting-screen').style.display = 'flex';
-                
+                document.getElementById('app-header').style.display = 'flex';
+                document.getElementById('bottom-bar').style.display = 'flex';
+                document.getElementById('room-display').innerText = "Room: " + code;
+
                 addVideo(localStream, name + " (You)", true, 'local');
 
-                // To make a room work without a server, we use roomCode + index (1 to 10)
-                // We try to find a free "slot" in the room
-                let foundSlot = false;
+                // Logic: Connect to slots 1-10 based on room code
                 for(let i=1; i<=10; i++) {
-                    const tryID = `${roomCode}-slot-${i}`;
-                    myPeer = new Peer(tryID);
-                    
-                    myPeer.on('open', id => {
-                        foundSlot = true;
-                        // Once we are in a slot, we call all other 9 possible slots to see who is there
+                    const myId = `${code}-${i}`;
+                    const tempPeer = new Peer(myId);
+
+                    tempPeer.on('open', (id) => {
+                        myPeer = tempPeer;
+                        // Successfully claimed a slot, now call everyone else
                         for(let j=1; j<=10; j++) {
                             if(i === j) continue;
-                            const targetID = `${roomCode}-slot-${j}`;
-                            callUser(targetID);
+                            callUser(`${code}-${j}`);
                         }
                     });
 
-                    myPeer.on('call', call => {
+                    tempPeer.on('call', call => {
                         call.answer(localStream);
-                        call.on('stream', stream => addVideo(stream, "Guest", false, call.peer));
+                        call.on('stream', userStream => addVideo(userStream, "Friend", false, call.peer));
                     });
 
-                    myPeer.on('error', err => {
-                        if(err.type === 'unavailable-id') return; // Slot taken, try next
+                    tempPeer.on('error', (err) => {
+                        if(err.type !== 'unavailable-id') console.error(err);
                     });
-                    
-                    if(foundSlot) break;
-                    await new Promise(r => setTimeout(r, 500)); // Short delay to check next slot
+
+                    // Break loop if slot found (with slight delay for PeerJS)
+                    await new Promise(r => setTimeout(r, 400));
+                    if (myPeer) break;
                 }
-
             } catch (e) {
-                alert("Camera Access Denied. Please ensure you are using HTTPS and have allowed permissions.");
+                alert("Error: Camera Access Denied. Make sure you are using HTTPS (GitHub Pages).");
             }
         };
 
-        function callUser(targetID) {
-            const call = myPeer.call(targetID, localStream);
-            call.on('stream', stream => addVideo(stream, "Guest", false, targetID));
+        function callUser(id) {
+            const call = myPeer.call(id, localStream);
+            call.on('stream', stream => addVideo(stream, "Friend", false, id));
         }
 
-        function addVideo(stream, name, isLocal, peerId) {
-            if (document.getElementById(peerId)) return;
+        function addVideo(stream, name, isLocal, id) {
+            if (document.getElementById(id)) return;
             const container = document.createElement('div');
-            container.id = peerId;
+            container.id = id;
             container.className = 'video-container';
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.autoplay = true;
-            video.playsInline = true;
-            if (isLocal) video.classList.add('local-video');
-            const badge = document.createElement('div');
-            badge.className = 'name-badge';
-            badge.innerText = name;
-            container.append(video, badge);
+            const v = document.createElement('video');
+            v.srcObject = stream;
+            v.autoplay = true;
+            v.playsInline = true;
+            if (isLocal) v.className = 'local-v';
+            const tag = document.createElement('div');
+            tag.className = 'name-tag';
+            tag.innerText = name;
+            container.append(v, tag);
             videoGrid.append(container);
         }
     </script>
