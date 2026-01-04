@@ -11,32 +11,35 @@
 
         body { 
             background: var(--bg); color: var(--text); 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             margin: 0; display: flex; flex-direction: column; align-items: center; 
             min-height: 100vh; transition: 0.3s;
         }
 
-        /* UI Layout */
-        .container { width: 90%; max-width: 900px; text-align: center; padding: 20px; }
+        .container { width: 95%; max-width: 1000px; text-align: center; padding: 20px; }
+        
+        /* Video Fix: Zoom/WhatsApp Style */
         .video-wrapper { 
             display: grid; grid-template-columns: 1fr 1fr; gap: 15px; 
-            margin-top: 20px; background: var(--card); padding: 15px; border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-top: 20px;
         }
-        video { width: 100%; border-radius: 10px; background: #000; object-fit: cover; }
+        .video-container { position: relative; background: #000; border-radius: 15px; overflow: hidden; aspect-ratio: 4/3; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        #local-video { transform: scaleX(-1); } /* Mirror effect for local cam */
         
-        /* Controls */
-        .controls { margin: 20px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; width: 200px; }
-        button { 
-            padding: 10px 20px; border: none; border-radius: 5px; 
-            cursor: pointer; background: var(--primary); color: white; font-weight: bold; 
+        .name-label { 
+            position: absolute; bottom: 10px; left: 10px; 
+            background: rgba(0,0,0,0.6); color: white; 
+            padding: 5px 12px; border-radius: 5px; font-size: 0.8em; 
         }
+
+        .setup-box { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 15px; }
+        
+        input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; outline: none; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; background: var(--primary); color: white; font-weight: bold; }
         #end-btn { background: #ef4444; }
         #theme-toggle { position: absolute; top: 20px; right: 20px; }
-
-        .id-display { font-size: 0.9em; margin-bottom: 10px; opacity: 0.8; }
-        b { color: var(--primary); }
 
         @media (max-width: 600px) { .video-wrapper { grid-template-columns: 1fr; } }
     </style>
@@ -48,72 +51,88 @@
     <div class="container">
         <h1>VcalL</h1>
         
-        <div class="id-display">Your ID: <b id="my-id">Connecting...</b></div>
-        
-        <div class="controls">
-            <input type="text" id="remote-id" placeholder="Enter Friend's ID">
-            <button id="call-btn">Start Call</button>
-            <button id="end-btn" onclick="location.reload()">End Call</button>
+        <div class="setup-box">
+            <div class="controls">
+                <input type="text" id="user-name" placeholder="Your Name">
+                <input type="text" id="custom-id" placeholder="Create Room ID (e.g. myroom123)">
+                <button id="set-id-btn">Set My ID</button>
+            </div>
+            <div class="controls" id="call-controls" style="display:none;">
+                <input type="text" id="remote-id" placeholder="Friend's Room ID">
+                <button id="call-btn">Call Friend</button>
+            </div>
         </div>
 
         <div class="video-wrapper">
-            <div>
-                <p>You</p>
+            <div class="video-container">
                 <video id="local-video" autoplay muted playsinline></video>
+                <div class="name-label" id="local-name-display">You</div>
             </div>
-            <div>
-                <p>Remote</p>
+            <div class="video-container">
                 <video id="remote-video" autoplay playsinline></video>
+                <div class="name-label" id="remote-name-display">Remote</div>
             </div>
         </div>
+        
+        <button id="end-btn" style="margin-top:20px;" onclick="location.reload()">End Call</button>
     </div>
 
     <script>
-        // 1. Initialize PeerJS (Connects to PeerJS public cloud server)
-        const peer = new Peer(); 
+        let peer;
         let localStream;
-
-        const myIdDisplay = document.getElementById('my-id');
-        const remoteIdInput = document.getElementById('remote-id');
-        const callBtn = document.getElementById('call-btn');
         const localVideo = document.getElementById('local-video');
         const remoteVideo = document.getElementById('remote-video');
 
-        // 2. Get Camera and Mic
+        // Get Camera
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then(stream => {
                 localStream = stream;
                 localVideo.srcObject = stream;
-            }).catch(err => alert("Please allow camera access"));
+            }).catch(err => alert("Camera error: " + err));
 
-        // 3. Show your ID once connected
-        peer.on('open', id => {
-            myIdDisplay.innerText = id;
-        });
+        // 1 & 2: Set Custom ID and Name
+        document.getElementById('set-id-btn').onclick = () => {
+            const myId = document.getElementById('custom-id').value;
+            const myName = document.getElementById('user-name').value;
 
-        // 4. Handle Incoming Calls
-        peer.on('call', call => {
-            call.answer(localStream); // Answer with your stream
-            call.on('stream', userRemoteStream => {
-                remoteVideo.srcObject = userRemoteStream;
-            });
-        });
+            if (!myId || !myName) return alert("Enter both Name and Room ID");
 
-        // 5. Start a Call to someone else
-        callBtn.onclick = () => {
-            const remoteId = remoteIdInput.value;
-            if (!remoteId) return alert("Enter an ID first!");
+            peer = new Peer(myId); // Initializes with your chosen ID
             
-            const call = peer.call(remoteId, localStream);
-            call.on('stream', userRemoteStream => {
-                remoteVideo.srcObject = userRemoteStream;
+            peer.on('open', (id) => {
+                document.getElementById('local-name-display').innerText = myName;
+                document.getElementById('call-controls').style.display = 'flex';
+                alert("ID Set! Share '" + id + "' with your friend.");
+            });
+
+            peer.on('error', (err) => alert("ID might be taken. Try another."));
+
+            // Receiving a call
+            peer.on('call', call => {
+                call.answer(localStream);
+                // In a real app, names are sent via data connection, 
+                // for this simple version we label it "Connected"
+                document.getElementById('remote-name-display').innerText = "Friend Connected";
+                call.on('stream', stream => { remoteVideo.srcObject = stream; });
             });
         };
 
-        // Day and Night Mode
-        document.getElementById('theme-toggle').onclick = () => {
-            document.body.classList.toggle('dark-mode');
+        // 3: Calling logic
+        document.getElementById('call-btn').onclick = () => {
+            const rId = document.getElementById('remote-id').value;
+            if (!rId) return alert("Enter Friend's ID");
+            
+            const call = peer.call(rId, localStream);
+            document.getElementById('remote-name-display').innerText = "Calling...";
+            
+            call.on('stream', stream => {
+                document.getElementById('remote-name-display').innerText = "Friend Connected";
+                remoteVideo.srcObject = stream;
+            });
         };
+
+        // Theme Toggle
+        document.getElementById('theme-toggle').onclick = () => document.body.classList.toggle('dark-mode');
     </script>
 </body>
 </html>
